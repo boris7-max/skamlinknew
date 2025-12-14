@@ -1,29 +1,32 @@
-// Управление вкладками
+// Управление навигацией
 document.addEventListener('DOMContentLoaded', function() {
-    // Инициализация вкладок
-    const tabButtons = document.querySelectorAll('.tab-btn');
-    const tabContents = document.querySelectorAll('.tab-content');
+    // Инициализация навигации
+    const navButtons = document.querySelectorAll('.nav-btn');
+    const pages = document.querySelectorAll('.page');
     
-    tabButtons.forEach(button => {
+    navButtons.forEach(button => {
         button.addEventListener('click', () => {
-            const tabId = button.getAttribute('data-tab');
+            const pageId = button.getAttribute('data-page');
             
             // Обновляем активные кнопки
-            tabButtons.forEach(btn => btn.classList.remove('active'));
+            navButtons.forEach(btn => btn.classList.remove('active'));
             button.classList.add('active');
             
-            // Показываем активный контент
-            tabContents.forEach(content => {
-                content.classList.remove('active');
-                if (content.id === tabId) {
-                    content.classList.add('active');
+            // Показываем активную страницу
+            pages.forEach(page => {
+                page.classList.remove('active');
+                if (page.id === pageId) {
+                    page.classList.add('active');
                 }
             });
             
             // Если открываем историю - обновляем ее
-            if (tabId === 'history') {
+            if (pageId === 'history-page') {
                 loadHistory();
             }
+            
+            // Прокручиваем вверх
+            window.scrollTo(0, 0);
         });
     });
     
@@ -50,11 +53,6 @@ function addToHistory(text, type, extra = '') {
     history.unshift(historyItem);
     if (history.length > 50) history = history.slice(0, 50);
     saveHistory();
-    
-    // Если открыта вкладка истории - обновляем
-    if (document.querySelector('#history').classList.contains('active')) {
-        loadHistory();
-    }
 }
 
 function loadHistory() {
@@ -78,7 +76,7 @@ function loadHistory() {
         }
         
         html += `
-            <div class="history-item">
+            <div class="history-item" style="border-left-color: ${color}">
                 <div style="flex: 1;">
                     <div class="history-text">${icon} ${item.text}</div>
                     <div class="history-meta">${item.timestamp} ${item.extra ? ' • ' + item.extra : ''}</div>
@@ -135,9 +133,12 @@ document.getElementById('refresh-history-btn')?.addEventListener('click', () => 
 // Standoff функция
 document.getElementById('standoff-btn')?.addEventListener('click', () => {
     const text = document.getElementById('standoff-text').value.trim();
+    const displayText = text || 'Запуск Standoff 2';
     
     if (text) {
         addToHistory(text, 'standoff');
+    } else {
+        addToHistory('Запуск Standoff 2', 'standoff');
     }
     
     // Пытаемся открыть игру
@@ -155,12 +156,15 @@ document.getElementById('standoff-btn')?.addEventListener('click', () => {
     }, 1000);
     
     showToast('Пытаемся открыть Standoff 2...');
+    
+    // Очищаем поле
+    document.getElementById('standoff-text').value = '';
 });
 
 // Генерация фейковых ссылок
 function generateFakeLink(platform) {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    const lowerChars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    const lowerChars = 'abcdefghijklmnopqrstuvwxyz0123456789_';
     
     function randomString(length, alphabet) {
         let result = '';
@@ -170,15 +174,24 @@ function generateFakeLink(platform) {
         return result;
     }
     
+    const platformNames = {
+        youtube: ['gaming', 'music', 'vlog', 'tutorial', 'review', 'live'],
+        telegram: ['channel', 'chat', 'bot', 'group', 'news'],
+        instagram: ['photo', 'reel', 'story', 'post', 'carousel'],
+        tiktok: ['dance', 'comedy', 'lifehack', 'tutorial', 'trend']
+    };
+    
+    const randomName = platformNames[platform][Math.floor(Math.random() * platformNames[platform].length)];
+    
     switch(platform) {
         case 'youtube':
-            return `https://youtube.com/watch?v=${randomString(11, chars)}`;
+            return `https://youtube.com/watch?v=${randomString(11, chars)}&t=${Math.floor(Math.random() * 300)}s`;
         case 'telegram':
-            return `https://t.me/${randomString(8 + Math.floor(Math.random() * 8), lowerChars)}`;
+            return `https://t.me/${randomName}_${randomString(6, lowerChars)}`;
         case 'instagram':
-            return `https://instagram.com/p/${randomString(11, chars)}`;
+            return `https://instagram.com/p/${randomString(11, chars)}/`;
         case 'tiktok':
-            return `https://tiktok.com/@user/video/${randomString(19, '0123456789')}`;
+            return `https://tiktok.com/@${randomName}_user/video/${Math.floor(Math.random() * 10000000000000000000)}`;
         default:
             return '';
     }
@@ -201,31 +214,57 @@ document.getElementById('copy-link-btn')?.addEventListener('click', () => {
     showToast('Ссылка скопирована!');
 });
 
-// MD5 генератор (упрощенный)
+// ИСПРАВЛЕННАЯ генерация MD5 (меньше нулей)
 function generateMD5(text) {
-    if (!text.trim()) {
-        // Генерация случайного MD5
-        const chars = '0123456789abcdef';
+    if (!text || !text.trim()) {
+        // Генерация случайного MD5 с минимумом нулей
+        const chars = '123456789abcdef'; // исключаем '0'
         let hash = '';
-        for (let i = 0; i < 32; i++) {
-            hash += chars[Math.floor(Math.random() * 16)];
+        
+        // Первые 4 символа - буквы
+        for (let i = 0; i < 4; i++) {
+            hash += 'abcdef'[Math.floor(Math.random() * 6)];
         }
+        
+        // Остальные - смесь букв и цифр (но не 0)
+        for (let i = 0; i < 28; i++) {
+            hash += chars[Math.floor(Math.random() * chars.length)];
+        }
+        
         return hash;
     }
     
-    // Простой хэш для демонстрации
-    let hash = 0;
-    for (let i = 0; i < text.length; i++) {
-        const char = text.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash;
+    // Реализация простого хэша для текста
+    function simpleHash(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash;
+        }
+        return Math.abs(hash);
     }
     
-    // Преобразуем в hex
-    let hexHash = Math.abs(hash).toString(16);
-    while (hexHash.length < 32) {
-        hexHash = '0' + hexHash;
+    // Создаем хэш из текста
+    let hash1 = simpleHash(text);
+    let hash2 = simpleHash(text + 'salt' + Date.now());
+    
+    // Преобразуем в hex и комбинируем
+    let hexHash = (hash1.toString(16) + hash2.toString(16));
+    
+    // Убираем нули в начале
+    hexHash = hexHash.replace(/^0+/, '');
+    
+    // Добавляем случайные буквы если нужно
+    const letters = 'abcdef';
+    if (hexHash.length < 32) {
+        const needed = 32 - hexHash.length;
+        for (let i = 0; i < needed; i++) {
+            hexHash = letters[Math.floor(Math.random() * 6)] + hexHash;
+        }
     }
+    
+    // Обрезаем до 32 символов
     return hexHash.substring(0, 32);
 }
 
@@ -237,7 +276,11 @@ document.getElementById('generate-md5-btn')?.addEventListener('click', () => {
     document.getElementById('md5-result').classList.remove('hidden');
     
     // Сохраняем в историю
-    addToHistory(hash, 'md5', text || 'случайный хэш');
+    const displayText = text ? `${text.substring(0, 20)}${text.length > 20 ? '...' : ''}` : 'случайный хэш';
+    addToHistory(hash, 'md5', displayText);
+    
+    // Очищаем поле
+    document.getElementById('md5-text').value = '';
 });
 
 document.getElementById('copy-md5-btn')?.addEventListener('click', () => {
@@ -248,15 +291,27 @@ document.getElementById('copy-md5-btn')?.addEventListener('click', () => {
 
 // Вспомогательные функции
 function copyToClipboard(text) {
-    navigator.clipboard.writeText(text).catch(() => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text);
+    } else {
         // Fallback для старых браузеров
         const textArea = document.createElement('textarea');
         textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.top = '0';
+        textArea.style.left = '0';
+        textArea.style.opacity = '0';
         document.body.appendChild(textArea);
+        textArea.focus();
         textArea.select();
-        document.execCommand('copy');
+        try {
+            document.execCommand('copy');
+        } catch (err) {
+            console.error('Не удалось скопировать текст:', err);
+        }
         document.body.removeChild(textArea);
-    });
+        return Promise.resolve();
+    }
 }
 
 function showToast(message, duration = 3000) {
@@ -271,5 +326,6 @@ function showToast(message, duration = 3000) {
     }, duration);
 }
 
-// Глобальная функция копирования
+// Глобальные функции
 window.copyToClipboard = copyToClipboard;
+window.showToast = showToast;
